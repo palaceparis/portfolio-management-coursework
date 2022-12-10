@@ -1,0 +1,240 @@
+# Library
+```{r}
+library(xlsx)
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(janitor)
+library(scales)
+```
+
+```{r}
+input = read.xlsx(here("data", "Report2_Data.xlsx"), sheetName = "R")
+```
+
+```{r}
+alpha_A = input$AF[3]
+sigma_2_e_A = input$AF[4]
+E_R_M = input$MF[8]
+sigma_2_M = input$MF[9]^2
+beta_A = 0.930822
+w_A0 = (alpha_A/sigma_2_e_A/(E_R_M/sigma_2_M))
+w_A_star = w_A0/(1+(1-beta_A)*w_A0)
+```
+
+# changing alpha
+```{r}
+w_A_star = 1
+w_A0 = w_A_star/(1-(1-beta_A)*w_A_star)
+alpha_A =w_A0*sigma_2_e_A*(E_R_M/sigma_2_M)
+draw = alpha_A
+
+sigma_2_e_A = input$AF[4]
+E_R_M = input$MF[8]
+sigma_2_M = input$MF[9]^2
+beta_A = 0.930822
+
+alpha_A = seq(0.006, 0, length=300)
+w_A_star = 0
+for (i in 1:length(alpha)){
+  w_A0 = (alpha_A[i]/sigma_2_e_A)/(E_R_M/sigma_2_M)
+  w_A_star[i] = w_A0/(1+(1-beta_A)*w_A0)
+}
+data = tibble(alpha_A, w_A_star)
+library(ggthemes)
+points =tibble(input$AF[3], input$AF[7])
+points[nrow(points)+1, ] = tibble(draw,1)
+colnames(points) = c("x", "y")
+```
+
+```{r}
+ggplot() +
+  theme_economist()+
+  geom_line(
+    data = data,
+    mapping = aes(alpha_A,w_A_star),
+    col='red'
+  )+
+  geom_point(
+    data = points,
+    mapping = aes(x,y),
+    shape = 4,
+   size = 2.0,
+  fill = "black"
+  )+
+  geom_segment(aes(x=draw,xend=draw,y=0,yend=1), 
+               linetype='solid', 
+               col = 'white',
+               size = 0.7)+
+  geom_text(
+    data = points,
+    mapping = aes(x,y),
+    label = paste0("(", round((points$x),4), ",", round((points$y),4),")"),
+    vjust = -0.5,
+    hjust =1.1
+    )+
+  ylab(expression('w'[A]^"*"))+
+  xlab(expression(alpha[A]))+
+  theme(axis.title.x = element_text(size=15, face="bold"),
+        axis.title.y = element_text(size=15, face="bold")
+      )
+# ggsave('alpha.png',dpi=300)
+```
+
+# changing beta
+```{r}
+w_A_star = 1
+w_A0 = input$AF[5]
+beta_A = 1-((w_A0/w_A_star)-1)/w_A0
+draw = beta_A
+
+w_A0 = input$AF[5]
+beta_A = seq(1.3, 0.5, length=300)
+w_A_star = 0
+for (i in 1:length(beta_A)){
+  w_A_star[i] = w_A0/(1+(1-beta_A[i])*w_A0)
+}
+data = tibble(beta_A, w_A_star)
+points =tibble(input$AF[6], input$AF[7])
+points[nrow(points)+1, ] = tibble(draw,1)
+colnames(points) = c("x", "y")
+```
+
+```{r}
+ggplot() +
+  theme_economist()+
+  geom_line(
+    data = data,
+    mapping = aes(beta_A,w_A_star),
+    col='red'
+  )+
+  geom_point(
+    data = points,
+    mapping = aes(x,y),
+    shape = 4,
+   size = 2.0,
+  fill = "black"
+  )+
+  geom_segment(aes(x=draw,xend=draw,y=0,yend=1), 
+               linetype='solid', 
+               col = 'white',
+               size = 0.7)+
+  geom_text(
+    data = points,
+    mapping = aes(x,y),
+    label = paste0("(", round((points$x),4), ",", round((points$y),4),")"),
+    vjust = -0.5,
+    hjust =1.1
+    )+
+  ylab(expression('w'[A]^"*"))+
+  xlab(expression(beta[A]))+
+  theme(axis.title.x = element_text(size=15, face="bold"),
+        axis.title.y = element_text(size=15, face="bold")
+      )
+ggsave('beta.png',dpi=300)
+```
+
+# changing information ratio
+```{r}
+set.seed(2020)
+alpha_A = runif(300, min = 0, max=0.005)
+sigma_A = runif(300,min = 0, max=0.04)
+info_ratio = alpha_A/sigma_A
+set = tibble(alpha_A, sigma_A, info_ratio)
+
+sigma_2_e_A = input$AF[4]
+E_R_M = input$MF[8]
+sigma_2_M = input$MF[9]^2
+beta_A = 0.930822
+w_A_star = 0
+for (i in 1:nrow(set)){
+  w_A0 = (set$alpha_A[i]/set$sigma_A[i]^2)/(E_R_M/sigma_2_M)
+  w_A_star[i] = w_A0/(1+(1-beta_A)*w_A0)
+}
+data = tibble(set$info_ratio, w_A_star)
+colnames(data) = c("info_ratio", "w_A_star")
+
+points =tibble(0.1499, 0.897)
+# points[nrow(points)+1, ] = tibble(draw,1)
+# points[nrow(points)+1,] = tibble(draw,0)
+colnames(points) = c("x", "y")
+data = data[!data$info_ratio %in% boxplot.stats(data$info_ratio)$out,]
+```
+
+```{r}
+ggplot() +
+  theme_economist()+
+  geom_line(
+    data = data,
+    mapping = aes(info_ratio,w_A_star),
+    col='red'
+  )+
+  geom_point(
+    data = points,
+    mapping = aes(x,y),
+    shape = 4,
+   size = 2.0,
+  fill = "black"
+  )+
+  geom_text(
+    data = points,
+    mapping = aes(x,y),
+    label = paste0("(", round((points$x),4), ",", round((points$y),4),")"),
+    vjust = -0.5,
+    hjust =1.1
+    )+
+  ylab(expression('w'[A]^"*"))+
+  xlab("Information ratio")+
+  theme(axis.title.x = element_text(size=15, face="bold"),
+        axis.title.y = element_text(size=15, face="bold")
+      )
+ggsave('info_ratio.png',dpi=300)
+```
+
+# Sectors
+```{r}
+library(kableExtra)
+
+securities = read.xlsx(here("data", "Report2_Data.xlsx"), sheetName = "Securities")
+count_secotrs = securities %>% group_by(Sector) %>% summarise(
+  Count = n()
+) %>% ungroup()
+
+count_secotrs$Proportion = count_secotrs$Count/sum(count_secotrs$Count)
+library(scales)
+count_secotrs$Proportion = percent(count_secotrs$Proportion)
+
+kbl(count_secotrs, align = "l") %>%
+  kable_classic(full_width = F) %>% 
+  save_kable("sector.png",zoom = 4)
+
+```
+
+```{r}
+variance = read.xlsx(here("data", "Report2_Data.xlsx"), sheetName = "Fee to access") %>% clean_names()
+sp500 = variance$total_variance[1]
+variance = variance[-1,]
+rownames(variance) = NULL
+variance$weights=round(variance$weights,2)
+ggplot()+
+  theme_economist()+
+  geom_point(
+    data = variance,
+    aes(x = security_name,
+        y = total_variance,
+        color = weights),
+  )+
+  guides(colour = guide_coloursteps(show.limits = TRUE))+
+  geom_hline(aes(yintercept = sp500),color = 'red')+
+  geom_text(aes(x = "AAPL", y = sp500, label="The Market"),
+            col ='#eb4034', vjust = -1, hjust = -0.5)+
+  xlab("Securities")+
+  ylab("Total variance")+
+    theme(axis.text.x = element_text(size = 10, angle = 40, vjust = 0.7),
+          axis.title.x = element_text(vjust = -0.5, size = 13),
+          axis.title.y = element_text(vjust = 3, size = 13),
+          plot.title = element_blank(),
+          legend.text = element_text(size=8))
+ggsave(file = "variance.png", width = 7, height =4, dpi = 300)
+```
+
